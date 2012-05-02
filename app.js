@@ -170,12 +170,12 @@ else{
 tweetstore.init({name:argv.db}, {}, function(){
     tweetstore.rebuildFTS(function(){});
     //load most recent tweets
-    /*
+    
     tweetstore.fetchRecent(30, function(err, tweets){
         winston.info('tweetstore.fetchRecent callback');
         recentTweets = tweets;
     });
-    */
+    
 });
 
 io.sockets.on('connection', function (socket) {
