@@ -1,0 +1,3 @@
+{
+    "oauth_callback": "http://localhost.faolancp.com:8088/sessions/callback"
+}

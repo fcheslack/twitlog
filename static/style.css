@@ -1,0 +1,92 @@
+@media screen {
+    
+body {
+    background-color: #DDD;
+    color: #444;
+    font:87.5%/1.42857143em "Lucida Grande", Verdana, sans-serif; 
+    padding: 0 0 40px;
+}
+
+body {
+    max-width:800px;
+    margin:auto;
+}
+
+div#content {
+    padding:5px;
+}
+
+h1 {
+    line-height: 1.5em;
+}
+
+h2 {
+    color: #666;
+}
+
+a:link {color: #38c;}
+a:visited {color: #38c;}
+a:hover {color: #369;}
+a:active {color: #333;}
+
+
+.windowheightbox {
+    min-height:600px;
+}
+
+div.tweet {
+    background-color: #e6e6e6;
+    border:1px solid black;
+    padding:5px;
+    margin:5px;
+    border-radius: 5px;
+    
+    
+    -moz-box-shadow: 0 0 5px 2px #888;
+    -webkit-box-shadow: 0 0 5px 2px #888;
+    box-shadow: 0 0 5px 2px #888;
+}
+
+img.twitterProfileImg {
+    float:left;
+    margin:5px;
+}
+
+span.from_user {
+    font-weight: bold;
+}
+
+
+
+.pullout-grabbutton {
+    position: absolute;
+    height: 54px;
+    width: 50px;
+    top: 0;
+    right: -46px;
+    border-radius: 0 10px 10px 0;
+    background-color: #D8D8D8;
+    box-shadow: 4px 4px 4px rgba(0,0,0,0.3);
+}
+
+.pullout {
+    background-color: #D8D8D8;
+    box-shadow: 4px 4px 4px rgba(0,0,0,0.3);
+    border-radius: 0 0 10px 0;
+    border:1px solid #AAA;
+    min-height:300px;
+    width:400px;
+    position:fixed;
+    top:200px;
+    left:-400px;
+}
+
+.pullout-controls > * {
+    margin: 20px;
+    padding-left: 30px;
+    padding-right: 30px;
+    display: block;
+}
+
+
+}

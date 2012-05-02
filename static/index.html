@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>TweetLog</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <link rel=stylesheet href="./style.css">
+    
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="//localhost.faolancp.com/tweetlog/jquery.tmpl.js"></script>
+    <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
+    <script src="http://localhost:8088/socket.io/socket.io.js"></script>
+    <script>
+    
+    </script>
+    
+    <script type="text/javascript" charset="utf-8">
+        var tweets = [];
+        var socket;
+        var oldestTweetID = '';
+        
+        var updateOldestTweet = function(testID){
+            if((oldestTweetID === '') || (oldestTweetID.length == testID.length && oldestTweetID > testID) || (parseInt(oldestTweetID, 10) > parseInt(testID, 10)) ){
+                oldestTweetID = testID;
+            }
+        }
+        
+        var displayTweets = function(tweets, older){
+            if(J.isArray(tweets)){
+                J.each(tweets, function(index, tweet){
+                    updateOldestTweet(tweet.id_str);
+                    var muText = tweet.text;
+                    if(tweet.entities){
+                        J.each(tweet.entities.user_mentions, function(index, mention){
+                            var mstring = '@' + mention.screen_name;
+                            var repstring = J("#mentionlinkTemplate").tmpl({screen_name:mention.screen_name}).html();
+                            muText = muText.replace(mstring, repstring);
+                            //console.log(mstring);
+                            //console.log(repstring);
+                        });
+                        J.each(tweet.entities.hashtags, function(index, hashtag){
+                            var hstring = '#' + hashtag.text;
+                            var repstring = J("#hashlinkTemplate").tmpl({hash_text:hashtag.text}).html();
+                            muText = muText.replace(hstring, repstring);
+                            //console.log(repstring);
+                        });
+                        J.each(tweet.entities.urls, function(index, url){
+                            var tstring = url.url;
+                            var repstring = J("#tweetedurlTemplate").tmpl({tweetedurl:url.url, displayurl:url.display_url}).html();
+                            muText = muText.replace(tstring, repstring);
+                            //console.log(repstring);
+                        });
+                    }
+                    tweet.muText = muText;
+                    //console.log(muText);
+                    if(older){
+                        J("#tweetTemplate").tmpl({tweet:tweet}).appendTo(J("#content"));
+                    }
+                    else{
+                        J("#tweetTemplate").tmpl({tweet:tweet}).prependTo(J("#content"));
+                    }
+                });
+            }
+        };
+        
+        var mentionRegex = /@([\S]+)/;
+        var urlRegex = /(http[\S]+)/;
+        var hashRegex = /#([\S]+)/;
+        
+        var J = jQuery.noConflict();
+        
+        jQuery(document).ready(function() {
+            //bind pullout grabber animation
+            J('#pullout-grabbutton').on('click', function(e){
+                console.log("grabbutton clicked");
+                var showing = J("#pullout").data('showing');
+                if(!showing){
+                    J("#pullout").animate({
+                        left: '0px'
+                    });
+                    J("#pullout").data('showing', true)
+                }
+                else{
+                    J("#pullout").animate({
+                        left: '-400px'
+                    });
+                    J("#pullout").data('showing', false)
+                }
+            });
+            
+            J("#more-tweets-link").on('click', function(e){
+                e.preventDefault();
+                socket.emit('moreTweets', {oldestTweetID:oldestTweetID});
+            });
+            
+            socket = io.connect('http://localhost:8088');
+            socket.on('initialTweets', function (data) {
+                //console.log(data);
+                tweets = data.tweets;
+                displayTweets(data.tweets.reverse());
+            });
+            
+            socket.on('newTweets', function (data) {
+                //console.log(data);
+                displayTweets(data.tweets);
+            });
+            
+            socket.on('olderTweets', function (data) {
+                displayTweets(data.tweets, true);
+            });
+            
+            socket.on('searchResults', function (data) {
+                J("#content").empty();
+                displayTweets(data.tweets, true);
+            });
+        });
+
+        
+    </script>
+    <script type="text/javascript">
+        var _gaq = _gaq || [];
+        _gaq.push(['_setAccount', 'UA-30755655-1']);
+        _gaq.push(['_trackPageview']);
+
+        (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+        })();
+    </script>
+</head>
+
+<body>
+<div id="content">
+    
+    
+</div>
+<div id="post-content">
+    <a href="#" id="more-tweets-link">More Tweets</a>
+    <span class="twitterWordmark">Content from Twitter</span>
+</div>
+
+<script id="mentionlinkTemplate" type="text/x-jquery-tmpl">
+    <div class="wrapdiv">
+    <a class="mentionlink" href="http://twitter.com/${screen_name}">@${screen_name}</a>
+    </div>
+</script>
+
+<script id="hashlinkTemplate" type="text/x-jquery-tmpl">
+    <div class="wrapdiv">
+    <a class="hashlink" href="http://twitter.com/search?q=%23${hash_text}">#${hash_text}</a>
+    </div>
+</script>
+
+<script id="tweetedurlTemplate" type="text/x-jquery-tmpl">
+    <div class="wrapdiv">
+    <a class="tweetedurllink" href="${tweetedurl}">${displayurl}</a>
+    </div>
+</script>
+
+<script id="tweetTemplate" type="text/x-jquery-tmpl">
+    <div class="tweet">
+        {{if tweet.from_user}}
+        <a href="http://twitter.com/${tweet.from_user}"><img class="twitterProfileImg" src="${tweet.profile_image_url}"></a>
+        <span class="from_user"><a href="http://twitter.com/${tweet.from_user}">${tweet.from_user}</a></span>
+        <span class="from_user_name">${tweet.from_user_name}</span>
+        <div class="tweetContent">
+            {{html tweet.muText}}
+        </div>
+        <span class="tweetTime"><a href="http://twitter.com/${tweet.from_user}/statuses/${tweet.id_str}">${tweet.created_at}</a></span>
+        <a href="https://twitter.com/intent/tweet?in_reply_to=${tweet.id_str}">Reply</a>
+        <a href="https://twitter.com/intent/retweet?tweet_id=${tweet.id_str}">Retweet</a>
+        <a href="https://twitter.com/intent/favorite?tweet_id=${tweet.id_str}">Favorite</a>
+        {{else tweet.user}}
+        <a href="http://twitter.com/${tweet.user.screen_name}"><img class="twitterProfileImg" src="${tweet.user.profile_image_url}"></a>
+        <span class="from_user"><a href="http://twitter.com/${tweet.user.screen_name}">${tweet.user.screen_name}</a></span>
+        <span class="from_user_name">${tweet.user.name}</span>
+        <div class="tweetContent">
+            {{html tweet.muText}}
+        </div>
+        <span class="tweetTime"><a href="http://twitter.com/${tweet.from_user}/statuses/${tweet.id_str}">${tweet.created_at}</a></span>
+        <a href="https://twitter.com/intent/tweet?in_reply_to=${tweet.id_str}">Reply</a>
+        <a href="https://twitter.com/intent/retweet?tweet_id=${tweet.id_str}">Retweet</a>
+        <a href="https://twitter.com/intent/favorite?tweet_id=${tweet.id_str}">Favorite</a>
+        {{/if}}
+    </div>
+</script>
+
+<div id="pullout" class="pullout">
+    <div id="pullout-grabbutton" class="pullout-grabbutton">
+        &gt;
+    </div>
+    <div id="pullout-menu">
+        <ul id="pullout-menu-links-list">
+            <li><a href="/sessions/connect" id="oauth-start">Authorize App</a></li>
+        </ul>
+    </div>
+</div>
+</body>
+
+</html>
