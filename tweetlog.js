@@ -4,6 +4,8 @@ var exec = require('child_process').exec;
 var fs = require('fs');
 var _ = require('underscore')._;
 var winston = require('winston');
+var Twitconnect = require('./lib/twitconnect.js').Twitconnect;
+
 winston.add(winston.transports.File, {filename: 'logs/tweetlog.log', maxsize:20971520, maxfiles:5, colorize:true});
 
 var argv = require('optimist')
@@ -19,16 +21,6 @@ var argv = require('optimist')
 //example of db = 'hastactweetlog'
 //example of track = 'hastac2011,hastac'
 
-var http = require('http');
-var url = require('url');
-var async = require('async');
-var intervalID;
-var pollDelay = 30000; //ms delay between requests when in polling mode
-var pollCount = 0;
-var mode = argv.mode;
-var retryStream = false;
-var retryStreamAfter = 50;
-var waitStartValue = 1000;
 var dbinfo = {};
 var logconfig = JSON.parse(fs.readFileSync('./config/logconfig.json', 'utf8'));
 
@@ -62,13 +54,35 @@ var credentials = {
 };
 
 winston.info(util.inspect(credentials));
-var twit = new twitter(credentials);
 
+var twitterConfig = _.extend({}, {credentials:credentials}, argv);
+var tc = new Twitconnect(twitterConfig);
 
-var wait = waitStartValue; //wait ms before reconnecting
+tc.tweetCallback = function(tweet){
+    winston.info("Received streamed tweet");
+    //store the tweet
+    tweetstore.storeTweet(tweet, function(err){
+        if(err){
+            winston.err("Error storing tweet");
+        }
+    });
+    //winston.info(util.inspect(tweet, false, null, true));
+    try{
+        if(tweet.from_user){
+            winston.info(tweet.created_at + ' : ' + tweet.from_user + ': ' + tweet.text);
+        }
+        else{
+            winston.info(tweet.created_at + ' : ' + tweet.user.screen_name + ': ' + tweet.text);
+        }
+    }
+    catch(e){
+        winston.info("Error showing streamed tweet");
+        winston.info(e);
+        winston.info(util.inspect(tweet));
+    }
+};
 
-var tweetlog = {};
-
+/*
 tweetlog.pollRest = function(callback){
     winston.info("pollRest");
     winston.info(argv.track);
@@ -346,14 +360,16 @@ tweetlog.startListening = function(){
         });
     });
 };
+*/
 
-tweetlog.cleanexit = function(){
+var cleanexit = function(){
     tweetstore.closeStore();
 };
 
-process.on('uncaughtException', function(err){
+/*process.on('uncaughtException', function(err){
     winston.info(err);
 });
+*/
 //startListening();
 
 
@@ -380,38 +396,9 @@ else{
     //winston.info('Tracking ' + argv.track + ' logging into DB ' + argv.db);
     tweetstore.init(dbinfo, {}, function(){
         winston.info("tweetstore initiated, ");
-        twit.verifyCredentials(function(err, data){
-            if(err){
-                winston.info("Error verifying twitter credentials. Have you fetched an oauth token yet?");
-                winston.info(err);
-                winston.info(data);
-                process.exit();
-            }
-            winston.info("Credentials verified okay");
-            winston.info(util.inspect(data));
-            
-            fillFromRest(function(data){
-                if(mode == 'stream'){
-                    retryStream = true;
-                    startListening();
-                }
-                else if(mode == 'poll'){
-                    startPolling(pollDelay);
-                }
-            });
-        });
+        tc.startListening();
     });
 }
 
-exports.pollRest = tweetlog.pollRest;
-exports.fetchMore = tweetlog.fetchMore;
-exports.pullFullUserTimeline = tweetlog.pullFullUserTimeline;
-exports.fillFromRest = tweetlog.fillFromRest;
-exports.startPolling = tweetlog.startPolling;
-exports.handleStreamedTweet = tweetlog.handleStreamedTweet;
-exports.handleStreamedMessage = tweetlog.handleStreamedMessage;
-exports.handleStreamedFriends = tweetlog.handleStreamedFriends;
-exports.startListening = tweetlog.startListening;
-exports.cleanExit = tweetlog.cleanExit;
 
 

@@ -7,7 +7,7 @@ var db;// = new sqlite3.Database();
 var tweets; //tweet log mongo collection
 
 //sqlite statements for our other functions to reuse
-var storeTweetStmt, storeEventStmt, fetchTweetStmt, fetchRecentStmt, fetchSinceStmt, fetchOlderStmt, searchTweetsStmt;
+var storeTweetStmt, storeEventStmt, fetchTweetStmt, fetchRecentStmt, fetchSinceStmt, fetchOlderStmt, searchTweetsStmt, insertNormalizedStmt;
 
 var rebuildFulltextQuery = "DROP TABLE IF EXISTS tweetsearch; CREATE VIRTUAL TABLE tweetsearch USING fts3(tweetid, tweettext); INSERT INTO tweetsearch (tweetid, tweettext) SELECT tweetid, text FROM tweets;";
 var searchQuery =  "SELECT tweets.* FROM tweets JOIN tweetsearch ON tweets.tweetid = tweetsearch.tweetid WHERE tweetsearch.tweettext MATCH ?;";
@@ -26,6 +26,7 @@ var init = function(dbp, options, callback){
         
         //create database if it doesn't exist yet
         var initDBScript = "CREATE TABLE IF NOT EXISTS tweets (tweetid INTEGER PRIMARY KEY, screen_name, time, text, fulltweet);";
+        initDBScript += "CREATE TABLE IF NOT EXISTS normtweets (tweetid INTEGER PRIMARY KEY, screen_name, created_at, text, in_reply_to_user_id, in_reply_to_screen_name, source, in_reply_to_status_id, fulltweet);";
         initDBScript += "CREATE INDEX IF NOT EXISTS tweettimeind ON tweets (time);";
         initDBScript += "CREATE TABLE IF NOT EXISTS streamevents (eventid INTEGER PRIMARY KEY ASC, eventtype, object);";
         initDBScript += "DROP TABLE IF EXISTS tweetsearch; CREATE VIRTUAL TABLE tweetsearch USING fts3(tweetid, tweettext); INSERT INTO tweetsearch (tweetid, tweettext) SELECT tweetid, text FROM tweets;";
@@ -91,6 +92,13 @@ var init = function(dbp, options, callback){
             
             searchTweetsStmt = db.prepare("SELECT tweets.* FROM tweets JOIN tweetsearch ON tweets.tweetid = tweetsearch.tweetid WHERE tweetsearch.tweettext MATCH ? LIMIT 100;", function(err){
                 winston.info("searchTweetsStmt callback");
+                if(err){
+                    throw err;
+                }
+            });
+            
+            insertNormalizedStmt = db.prepare("INSERT OR REPLACE INTO normtweets VALUES (?, ?,?,?,?,?,?,?,?);", function(err){
+                winston.info("insertNormalizedStmt callback");
                 if(err){
                     throw err;
                 }
@@ -190,7 +198,7 @@ var fetchMore = function(oldestid, limit, callback){
 var rebuildFTS = function(callback){
     winston.info("rebuildFTS");
     db.exec(rebuildFulltextQuery, function(err, data){
-        winston.info("rebuildFulltextQuery returned")
+        winston.info("rebuildFulltextQuery returned");
         if(err){
             winston.info("Error rebuilding FTS");
             winston.info(err);
@@ -215,63 +223,37 @@ var searchTweets = function(q, callback){
         }
         callback(err, parsedRows);
     });
-    /*
-    db.serialize(function(){
-        db.exec(rebuildFulltextQuery);
-        db.all(searchQuery, [q], function(err, rows){
-            winston.info('searchTweetsCallback');
-            winston.info(util.inspect(rows));
-            if(err){
-                winston.info("Error searching tweets");
-                winston.info(err);
-                callback(err, rows);
-            }
-            var parsedRows = [];
-            for(var i = 0; i < rows.length; i++){
-                parsedRows.push(JSON.parse(rows[i].fulltweet));
-            }
-            callback(err, parsedRows);
+};
+
+var normalizeTweets = function(){
+    db.each("SELECT fulltweet FROM tweets;", function(err, result){
+        if(err){
+            winston.info("Error normalizing tweet");
+        }
+        
+        var t = JSON.parse(result.fulltweet);
+        var td = {
+            'tweetid': t.id_str,
+            'created_at': t.created_at,
+            'screen_name': '',
+            'text': t.text,
+            'in_reply_to_user_id': t.in_reply_to_user_id,
+            'in_reply_to_screen_name': t.in_reply_to_screen_name,
+            'source': t.source,
+            'in_reply_to_status_id': t.in_reply_to_status_id
+        };
+        
+        if(t.user){
+            td.screen_name = t.user.screen_name;
+        }
+        else{
+            td.screen_name = t.from_user;
+        }
+        var bindings = [td.tweetid, td.screen_name, td.created_at, td.text, td.in_reply_to_user_id, td.in_reply_to_screen_name, td.source, td.in_reply_to_status, result.fulltweet];
+        insertNormalizedStmt.run(bindings, function(){
+            //inserted normalized
         });
     });
-    */
-    /*
-    db.all(searchQuery, [q], function(err, rows){
-        winston.info('searchTweetsCallback');
-        winston.info(util.inspect(rows));
-        if(err){
-            winston.info("Error searching tweets");
-            winston.info(err);
-            callback(err, rows);
-        }
-        var parsedRows = [];
-        for(var i = 0; i < rows.length; i++){
-            parsedRows.push(JSON.parse(rows[i].fulltweet));
-        }
-        callback(err, parsedRows);
-    });
-    */
-    /*
-    rebuildFTS(function(err, data){
-        if(err){
-            winston.error("Error rebuilding FTS");
-            winston.error(err);
-        }
-        searchTweetsStmt.all([q], function(err, rows){
-            winston.info('searchTweetsCallback');
-            winston.info(util.inspect(rows));
-            if(err){
-                winston.info("Error searching tweets");
-                winston.info(err);
-                callback(err, rows);
-            }
-            var parsedRows = [];
-            for(var i = 0; i < rows.length; i++){
-                parsedRows.push(JSON.parse(rows[i].fulltweet));
-            }
-            callback(err, parsedRows);
-        });
-    });
-    */
 };
 
 var closeStore = function(){
@@ -293,3 +275,5 @@ exports.closeStore = closeStore;
 exports.rebuildFTS = rebuildFTS;
 exports.fetchMore = fetchMore;
 exports.searchTweets = searchTweets;
+exports.normalizeTweets = normalizeTweets;
+
