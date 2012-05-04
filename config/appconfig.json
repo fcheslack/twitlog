@@ -1,3 +1,5 @@
 {
-    "oauth_callback": "http://localhost.faolancp.com:8088/sessions/callback"
+    "oauth_callback": "http://localhost.faolancp.com:8088/sessions/callback",
+    "db": "./fcheslackuserstream.db",
+    "dbtype": "sqlite"
 }

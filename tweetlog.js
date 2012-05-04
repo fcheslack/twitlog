@@ -9,11 +9,11 @@ winston.add(winston.transports.File, {filename: 'logs/tweetlog.log', maxsize:209
 var argv = require('optimist')
     .usage('Usage: $0 --track=hashtag --db=DBName')
     //.demand(['track', 'db'])
-    .default('db', 'tweetlog') //db to store tweets in
+//    .default('db', 'tweetlog') //db to store tweets in
     .default('mode', 'stream') // poll or stream. If stream becomes unreliable may fall back to poll during operation
     .default('initializeBackfill', false) //fetch as far back as we can on the search term to start
-    .default('dbtype', 'sqlite')
-    .default('logtype', 'user')
+//    .default('dbtype', 'sqlite')
+//    .default('logtype', 'user')
     .argv;
 
 //example of db = 'hastactweetlog'
@@ -30,6 +30,9 @@ var retryStream = false;
 var retryStreamAfter = 50;
 var waitStartValue = 1000;
 var dbinfo = {};
+var logconfig = JSON.parse(fs.readFileSync('./config/logconfig.json', 'utf8'));
+
+argv = _.extend({}, logconfig, argv);
 
 var tweetstore;
 if(argv.dbtype == 'sqlite'){
@@ -64,19 +67,26 @@ var twit = new twitter(credentials);
 
 var wait = waitStartValue; //wait ms before reconnecting
 
-var pollRest = function(callback){
+var tweetlog = {};
+
+tweetlog.pollRest = function(callback){
     winston.info("pollRest");
     winston.info(argv.track);
     twit.search(argv.track, {result_type:'recent', rpp:100, include_entities:'true'}, function(err, data) {
         _.each(data.results, function(val, index){
-            tweetstore.storeTweet(val, function(){});
+            tweetstore.storeTweet(val, function(err, ret){
+                if(err){
+                    winston.log("Error storing tweet");
+                    winston.log(err);
+                }
+            });
         });
         winston.info(util.inspect(data, false, null, true));
         callback(data);
     });
 };
 
-var fetchMore = function(params, callback){
+tweetlog.fetchMore = function(params, callback){
     winston.info("fetchMore");
     winston.info(util.inspect(params));
     twit.getUserTimeline(params, function(err, data){
@@ -113,7 +123,7 @@ var fetchMore = function(params, callback){
     });
 };
 
-var pullFullUserTimeline = function(params, callback){
+tweetlog.pullFullUserTimeline = function(params, callback){
     winston.info("pullFullUserTimeline");
     var totalRequests = 0;
     var rparams = {screen_name:'fcheslack', include_entities:'true', include_rts:'true', exclude_replies:'false', count:200};
@@ -124,11 +134,11 @@ var pullFullUserTimeline = function(params, callback){
     });
 };
 
-var fillTimelineFromRest = function(params, callback){
+tweetlog.fillTimelineFromRest = function(params, callback){
     
 };
 
-var fillFromRest = function(callback){
+tweetlog.fillFromRest = function(callback){
     winston.info('fillFromRest');
     pollCount++;
     if(retryStream && pollCount > retryStreamAfter){
@@ -201,11 +211,11 @@ var fillFromRest = function(callback){
     
 };
 
-var startPolling = function(delay){
+tweetlog.startPolling = function(delay){
     intervalID = setInterval(fillFromRest, delay, function(){});
 };
 
-var handleStreamedTweet = function(tweet){
+tweetlog.handleStreamedTweet = function(tweet){
     winston.info("Received streamed tweet");
     //store the tweet
     tweetstore.storeTweet(tweet, function(err){
@@ -229,7 +239,7 @@ var handleStreamedTweet = function(tweet){
     }
 };
 
-var handleStreamedMessage = function(msg){
+tweetlog.handleStreamedMessage = function(msg){
     winston.info("received streamed message");
     if(msg.id_str){
         //an actual tweet, rather than a twitter event
@@ -248,12 +258,12 @@ var handleStreamedMessage = function(msg){
     }
 };
 
-var handleStreamedFriends = function(friends){
+tweetlog.handleStreamedFriends = function(friends){
     winston.info("received list of friends for user stream");
     //winston.info(util.inspect(friends));
 };
 
-var startListening = function(){
+tweetlog.startListening = function(){
     var streamtype;
     var streamargs = {};
     if(argv.logtype == 'user'){
@@ -337,7 +347,7 @@ var startListening = function(){
     });
 };
 
-var cleanexit = function(){
+tweetlog.cleanexit = function(){
     tweetstore.closeStore();
 };
 
@@ -392,5 +402,16 @@ else{
         });
     });
 }
+
+exports.pollRest = tweetlog.pollRest;
+exports.fetchMore = tweetlog.fetchMore;
+exports.pullFullUserTimeline = tweetlog.pullFullUserTimeline;
+exports.fillFromRest = tweetlog.fillFromRest;
+exports.startPolling = tweetlog.startPolling;
+exports.handleStreamedTweet = tweetlog.handleStreamedTweet;
+exports.handleStreamedMessage = tweetlog.handleStreamedMessage;
+exports.handleStreamedFriends = tweetlog.handleStreamedFriends;
+exports.startListening = tweetlog.startListening;
+exports.cleanExit = tweetlog.cleanExit;
 
 

@@ -89,7 +89,7 @@ var init = function(dbp, options, callback){
                 }
             });
             
-            searchTweetsStmt = db.prepare("SELECT tweets.* FROM tweets JOIN tweetsearch ON tweets.tweetid = tweetsearch.tweetid WHERE tweetsearch.tweettext MATCH ?;", function(err){
+            searchTweetsStmt = db.prepare("SELECT tweets.* FROM tweets JOIN tweetsearch ON tweets.tweetid = tweetsearch.tweetid WHERE tweetsearch.tweettext MATCH ? LIMIT 100;", function(err){
                 winston.info("searchTweetsStmt callback");
                 if(err){
                     throw err;

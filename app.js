@@ -14,7 +14,7 @@ var argv = require('optimist')
     //.demand(['track', 'db'])
     .default('credfile', './config/credentials.json') //db to store tweets in
     .default('conffile', './config/appconfig.json') //db to store tweets in
-    .default('db', 'tweetlog') //db to store tweets in
+//    .default('db', 'tweetlog') //db to store tweets in
     .default('dbtype', 'sqlite')
     .argv;
     
@@ -149,15 +149,15 @@ app.listen(parseInt(process.env.PORT || 8088, 10));
 
 
 
-if(argv.dbtype == 'sqlite'){
+if(conf.dbtype == 'sqlite'){
     winston.info('using sqlite tweetstore');
     tweetstore = require('./tweetstore_sqlite.js');
-    dbinfo.name = argv.db;
+    dbinfo.name = conf.db;
 }
-else if(argv.dbtype == 'mongodb'){
+else if(conf.dbtype == 'mongodb'){
     winston.info('using mongodb tweetstore');
     tweetstore = require('./tweetstore_mongodb.js');
-    dbinfo.name = argv.db;
+    dbinfo.name = conf.db;
     dbinfo.address = '127.0.0.1';
     dbinfo.port = 27017;
 }
@@ -167,7 +167,7 @@ else{
 }
 
 //initialize tweetstore
-tweetstore.init({name:argv.db}, {}, function(){
+tweetstore.init(dbinfo, {}, function(){
     tweetstore.rebuildFTS(function(){});
     //load most recent tweets
     
@@ -192,6 +192,16 @@ io.sockets.on('connection', function (socket) {
             socket.emit('olderTweets', {tweets:tweets});
           });
         }
+    });
+    
+    socket.on('search', function (data) {
+        if(!data.q){
+            return;
+        }
+        tweetstore.searchTweets(data.q, function(err, tweets){
+            var r = {tweets:tweets};
+            socket.emit('searchResults', r);
+        });
     });
 });
 

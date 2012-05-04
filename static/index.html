@@ -27,7 +27,7 @@
             }
         }
         
-        var displayTweets = function(tweets, older){
+        var displayTweets = function(tweets, targetEl, older){
             if(J.isArray(tweets)){
                 J.each(tweets, function(index, tweet){
                     updateOldestTweet(tweet.id_str);
@@ -56,10 +56,10 @@
                     tweet.muText = muText;
                     //console.log(muText);
                     if(older){
-                        J("#tweetTemplate").tmpl({tweet:tweet}).appendTo(J("#content"));
+                        J("#tweetTemplate").tmpl({tweet:tweet}).appendTo(targetEl);
                     }
                     else{
-                        J("#tweetTemplate").tmpl({tweet:tweet}).prependTo(J("#content"));
+                        J("#tweetTemplate").tmpl({tweet:tweet}).prependTo(targetEl);
                     }
                 });
             }
@@ -95,25 +95,39 @@
                 socket.emit('moreTweets', {oldestTweetID:oldestTweetID});
             });
             
+            J("#search-link").on('click', function(e){
+                e.preventDefault();
+                J("#content").hide();
+                J("#searchcontent").show();
+                var q = J("#search-input").val();
+                socket.emit('search', {q:q});
+            });
+            
+            J("#live-stream-link").on('click', function(e){
+                e.preventDefault();
+                J("#searchcontent").hide();
+                J("#content").show();
+            });
+            
             socket = io.connect('http://localhost:8088');
             socket.on('initialTweets', function (data) {
                 //console.log(data);
                 tweets = data.tweets;
-                displayTweets(data.tweets.reverse());
+                displayTweets(data.tweets.reverse(), J("#content .tweets-container"));
             });
             
             socket.on('newTweets', function (data) {
                 //console.log(data);
-                displayTweets(data.tweets);
+                displayTweets(data.tweets, J("#content .tweets-container"));
             });
             
             socket.on('olderTweets', function (data) {
-                displayTweets(data.tweets, true);
+                displayTweets(data.tweets, J("#content .tweets-container"), true);
             });
             
             socket.on('searchResults', function (data) {
-                J("#content").empty();
-                displayTweets(data.tweets, true);
+                J("#searchcontent").empty();
+                displayTweets(data.tweets, J("#searchcontent .tweets-container"));
             });
         });
 
@@ -134,8 +148,16 @@
 
 <body>
 <div id="content">
-    
-    
+    <h2>Live Stream</h2>
+    <div class="tweets-container">
+        
+    </div>
+</div>
+<div id="searchcontent">
+    <h2>Archive Search</h2>
+    <div class="tweets-container">
+        
+    </div>
 </div>
 <div id="post-content">
     <a href="#" id="more-tweets-link">More Tweets</a>
@@ -194,7 +216,11 @@
     </div>
     <div id="pullout-menu">
         <ul id="pullout-menu-links-list">
+            <li><input type="text" id="search-input" /><a href="#" id="search-link">Search</a></li>
+            <li><a href="#" id="live-stream-link">Live Stream</a></li>
+            <!--
             <li><a href="/sessions/connect" id="oauth-start">Authorize App</a></li>
+            -->
         </ul>
     </div>
 </div>
