@@ -1,6 +1,4 @@
-var twitter = require('ntwitter');
 var util = require('util');
-var exec = require('child_process').exec;
 var fs = require('fs');
 var _ = require('underscore')._;
 var winston = require('winston');
@@ -40,7 +38,7 @@ else if(argv.dbtype == 'mongodb'){
     dbinfo.port = 27017;
 }
 else{
-    winston.err("invalid dbtype specified for logging");
+    winston.error("invalid dbtype specified for logging");
     process.exit();
 }
 
@@ -53,17 +51,18 @@ var credentials = {
     "access_token_secret": ntwitCredentials.oauthAccessTokenSecret
 };
 
-winston.info(util.inspect(credentials));
+winston.verbose(util.inspect(credentials));
 
 var twitterConfig = _.extend({}, {credentials:credentials}, argv);
 var tc = new Twitconnect(twitterConfig);
 
 tc.tweetCallback = function(tweet){
-    winston.info("Received streamed tweet");
+    winston.verbose("Received streamed tweet");
     //store the tweet
     tweetstore.storeTweet(tweet, function(err){
         if(err){
-            winston.err("Error storing tweet");
+            winston.error("Error storing tweet");
+            winston.error(err);
         }
     });
     //winston.info(util.inspect(tweet, false, null, true));
@@ -234,7 +233,7 @@ tweetlog.handleStreamedTweet = function(tweet){
     //store the tweet
     tweetstore.storeTweet(tweet, function(err){
         if(err){
-            winston.err("Error storing tweet");
+            winston.error("Error storing tweet");
         }
     });
     //winston.info(util.inspect(tweet, false, null, true));
@@ -374,29 +373,70 @@ var cleanexit = function(){
 
 
 if(argv.fillUserStream){
+    winston.info("FILLING USER STREAM");
     tweetstore.init(dbinfo, {}, function(){
         winston.info("tweetstore initiated, ");
         twit.verifyCredentials(function(err, data){
             if(err){
-                winston.info("Error verifying twitter credentials. Have you fetched an oauth token yet?");
-                winston.info(err);
-                winston.info(data);
+                winston.error("Error verifying twitter credentials. Have you fetched an oauth token yet?");
+                winston.error(err);
+                winston.verbose(data);
                 process.exit();
             }
             winston.info("Credentials verified okay");
-            winston.info(util.inspect(data));
+            winston.verbose(util.inspect(data));
             winston.info("Pulling full user timeline");
             pullFullUserTimeline({}, function(){
-                winston.log("Finished pulling full user timeline");
+                winston.info("Finished pulling full user timeline");
             });
         });
     });
 }
+else if(argv.backlog){
+    winston.info("FILLING BACKLOG");
+    tweetstore.init(dbinfo, {}, function(){
+        winston.info("tweetstore initiated");
+        if(argv.username){
+            tc.fillTimelineFromRest(argv.username, {}, function(err, tweets){
+                _.each(tweets, function(tweet, ind){
+                    tc.tweetCallback(tweet);
+                });
+                winston.info("Done filling user timeline backlog");
+            });
+        }
+        else if(argv.search){
+            tc.fillSearchFromRest(argv.search, {}, function(err, tweets){
+                _.each(tweets, function(tweet, ind){
+                    tc.tweetCallback(tweet);
+                });
+                winston.info("Done filling search backlog");
+            });
+        }
+    });
+}
 else{
+    winston.info("Filling userstream after the most recent tweet, then streaming tweets");
     //winston.info('Tracking ' + argv.track + ' logging into DB ' + argv.db);
     tweetstore.init(dbinfo, {}, function(){
         winston.info("tweetstore initiated, ");
-        tc.startListening();
+        //backfill log of tweets in home timeline after the most reent tweet we have record of
+        tweetstore.fetchRecent(1, function(err, tweets){
+            if(err){
+                winston.error("Error finding most recent tweet from storage");
+            }
+            var recentTweet;
+            if(tweets.length){
+                recentTweet = tweets[0];
+                tc.fillTimelineFromRest(null, {since_id: recentTweet.id_str}, function(err, tweets){
+                    _.each(tweets, function(tweet, ind){
+                        tc.tweetCallback(tweet);
+                    });
+                    winston.info("Done filling search backlog");
+                });
+            }
+            //start streaming
+            tc.startListening();
+        });
     });
 }
 
