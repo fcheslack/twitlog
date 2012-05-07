@@ -1,7 +1,9 @@
 ___Install___
 
 >git clone git://github.com/fcheslack/twitlog.git
+
 >cd twitlog
+
 >npm rebuild
 
 __initialize OAuth__
