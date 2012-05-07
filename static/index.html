@@ -126,7 +126,7 @@
             });
             
             socket.on('searchResults', function (data) {
-                J("#searchcontent").empty();
+                J("#searchcontent .tweets-container").empty();
                 displayTweets(data.tweets, J("#searchcontent .tweets-container"));
             });
         });

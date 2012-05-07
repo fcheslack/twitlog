@@ -1,0 +1,6 @@
+{
+    "logtype": "user",
+    "track": ["nodejs"],
+    "dbtype": "sqlite",
+    "db": "./twitlog.db"
+}

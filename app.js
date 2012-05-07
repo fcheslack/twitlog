@@ -45,7 +45,7 @@ function consumer() {
 }
 
 app.configure('development', function(){
-  app.use(app.router);
+//  app.use(app.router);
   app.use(express.static(__dirname + '/static'));
   app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
   app.use(express.logger());
@@ -117,6 +117,8 @@ if(argv.initoauth){
             credentials.oauthAccessToken = req.session.oauthAccessToken;
             credentials.oauthAccessTokenSecret = req.session.oauthAccessTokenSecret;
             fs.writeFileSync(argv.credfile, JSON.stringify(credentials) );
+            winston.info("Got oauth. Now you can run twitlog.js with read access to your account.");
+            process.exit(0);
           }
         });
       }

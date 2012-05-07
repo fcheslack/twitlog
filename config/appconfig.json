@@ -1,5 +1,5 @@
 {
-    "oauth_callback": "http://localhost.faolancp.com:8088/sessions/callback",
-    "db": "./fcheslackuserstream.db",
+    "oauth_callback": "http://127.0.0.1:8088/sessions/callback",
+    "db": "./twitlog.db",
     "dbtype": "sqlite"
 }
