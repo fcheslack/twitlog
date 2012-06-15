@@ -75,9 +75,9 @@ tc.tweetCallback = function(tweet){
         }
     }
     catch(e){
-        winston.info("Error showing streamed tweet");
-        winston.info(e);
-        winston.info(util.inspect(tweet));
+        winston.error("Error showing streamed tweet");
+        winston.error(e);
+        winston.error(util.inspect(tweet));
     }
 };
 
@@ -96,7 +96,7 @@ var cleanexit = function(){
 if(argv.fillUserStream){
     winston.info("FILLING USER STREAM");
     tweetstore.init(dbinfo, {}, function(){
-        winston.info("tweetstore initiated, ");
+        winston.verbose("tweetstore initiated");
         twit.verifyCredentials(function(err, data){
             if(err){
                 winston.error("Error verifying twitter credentials. Have you fetched an oauth token yet?");
@@ -116,7 +116,7 @@ if(argv.fillUserStream){
 else if(argv.backlog){
     winston.info("FILLING BACKLOG");
     tweetstore.init(dbinfo, {}, function(){
-        winston.info("tweetstore initiated");
+        winston.verbose("tweetstore initiated");
         if(argv.username){
             tc.fillTimelineFromRest(argv.username, {}, function(err, tweets){
                 _.each(tweets, function(tweet, ind){
@@ -147,21 +147,44 @@ else{
     winston.info("Filling userstream after the most recent tweet, then streaming tweets");
     //winston.info('Tracking ' + argv.track + ' logging into DB ' + argv.db);
     tweetstore.init(dbinfo, {}, function(){
-        winston.info("tweetstore initiated, ");
+        winston.verbose("tweetstore initiated, ");
         //backfill log of tweets in home timeline after the most reent tweet we have record of
         tweetstore.fetchRecent(1, function(err, tweets){
             if(err){
                 winston.error("Error finding most recent tweet from storage");
             }
+            
             var recentTweet;
-            if(tweets.length){
-                recentTweet = tweets[0];
-                tc.fillTimelineFromRest(null, {since_id: recentTweet.id_str}, function(err, tweets){
-                    _.each(tweets, function(tweet, ind){
-                        tc.tweetCallback(tweet);
+            if(argv.logtype === 'user'){
+                if(tweets.length){
+                    recentTweet = tweets[0];
+                    tc.fillTimelineFromRest(null, {since_id: recentTweet.id_str}, function(err, tweets){
+                        _.each(tweets, function(tweet, ind){
+                            tc.tweetCallback(tweet);
+                        });
+                        winston.info("Done filling user timeline backlog");
+                        //Fill tracking backlog
+                        _.each(argv.track, function(val, ind){
+                            tc.fillSearchFromRest(val, {since_id: recentTweet.id_str}, function(err, tweets){
+                                _.each(tweets, function(tweet, ind){
+                                    tc.tweetCallback(tweet);
+                                });
+                            });
+                        });
                     });
-                    winston.info("Done filling search backlog");
-                });
+                }
+            }
+            else if(argv.logtype === 'track' || argv.logtype === 'search'){
+                if(tweets.length){
+                    recentTweet = tweets[0];
+                    _.each(argv.track, function(val, ind){
+                        tc.fillSearchFromRest(val, {since_id: recentTweet.id_str}, function(err, tweets){
+                            _.each(tweets, function(tweet, ind){
+                                tc.tweetCallback(tweet);
+                            });
+                        });
+                    });
+                }
             }
             //start streaming
             tc.startListening();

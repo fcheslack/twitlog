@@ -1,6 +1,7 @@
 var sqlite3 = require('sqlite3').verbose();
 var util = require('util');
 var winston = require('winston');
+var _ = require('underscore')._;
 //winston.add(winston.transports.File, {filename: 'logs/tweetstore_sqlite.log'});
 
 var db;// = new sqlite3.Database();
@@ -27,8 +28,13 @@ var init = function(dbp, options, callback){
         //create database if it doesn't exist yet
         var initDBScript = "CREATE TABLE IF NOT EXISTS tweets (tweetid INTEGER PRIMARY KEY, screen_name, time, text, fulltweet);";
         initDBScript += "CREATE TABLE IF NOT EXISTS normtweets (tweetid INTEGER PRIMARY KEY, screen_name, created_at, text, in_reply_to_user_id, in_reply_to_screen_name, source, in_reply_to_status_id, fulltweet);";
-        initDBScript += "CREATE INDEX IF NOT EXISTS tweettimeind ON tweets (time);";
+        initDBScript += "CREATE TABLE IF NOT EXISTS tweettimestamps (tweetid INTEGER PRIMARY KEY, timestamp);";
+        initDBScript += "CREATE INDEX IF NOT EXISTS tweettimeind ON tweettimestamps (timestamp);";
         initDBScript += "CREATE TABLE IF NOT EXISTS streamevents (eventid INTEGER PRIMARY KEY ASC, eventtype, object);";
+        initDBScript += "CREATE TABLE IF NOT EXISTS media (mediaid, tweetid, expanded_url, type, object, UNIQUE (mediaid, tweetid));";
+        initDBScript += "CREATE TABLE IF NOT EXISTS user_mentions (userid, tweetid, screen_name, name, object, UNIQUE(userid, tweetid));";
+        initDBScript += "CREATE TABLE IF NOT EXISTS urls (expanded_url, tweetid, url, object, UNIQUE (expanded_url, tweetid));";
+        initDBScript += "CREATE TABLE IF NOT EXISTS hashtags (text, tweetid, object, UNIQUE (text, tweetid));";
         initDBScript += "DROP TABLE IF EXISTS tweetsearch; CREATE VIRTUAL TABLE tweetsearch USING fts3(tweetid, tweettext); INSERT INTO tweetsearch (tweetid, tweettext) SELECT tweetid, text FROM tweets;";
         
         db.exec(initDBScript, function(err){
@@ -43,6 +49,13 @@ var init = function(dbp, options, callback){
             //prepare our sqlite statements
             storeTweetStmt = db.prepare("INSERT INTO tweets (tweetid, screen_name, time, text, fulltweet) VALUES (?, ?, ?, ?, ?);", function(err){
                 winston.info("storeTweetStmt callback");
+                if(err){
+                    throw err;
+                }
+            });
+            
+            storeTimestampStmt = db.prepare("INSERT INTO tweettimestamps (tweetid, timestamp) VALUES (?, ?);", function(err){
+                winston.info("storeTimestampStmt callback");
                 if(err){
                     throw err;
                 }
@@ -104,12 +117,88 @@ var init = function(dbp, options, callback){
                 }
             });
             
+            //insert entities statements
+            insertMediaStmt = db.prepare("INSERT OR REPLACE INTO media VALUES (?, ?,?,?,?);", function(err){
+                winston.info("insertMediaStmt callback");
+                if(err){
+                    throw err;
+                }
+            });
+            
+            insertUserMentionStmt = db.prepare("INSERT OR REPLACE INTO user_mentions VALUES (?, ?,?,?,?);", function(err){
+                winston.info("insertUserMentionStmt callback");
+                if(err){
+                    throw err;
+                }
+            });
+            
+            insertUrlStmt = db.prepare("INSERT OR REPLACE INTO urls VALUES (?, ?,?,?);", function(err){
+                winston.info("insertUrlStmt callback");
+                if(err){
+                    throw err;
+                }
+            });
+            
+            insertHashtagStmt = db.prepare("INSERT OR REPLACE INTO hashtags VALUES (?, ?,?);", function(err){
+                winston.info("insertHashtagStmt callback");
+                if(err){
+                    throw err;
+                }
+            });
+            
+            
+            
             winston.info('done calling db.prepares');
             callback(null);
         });
     });
 };
 
+var storeMedia = function(tweet, mediaOb, callback){
+    winston.info("tweetstore.storeMedia");
+    insertMediaStmt.run([mediaOb.id_str, tweet.id_str, mediaOb.expanded_url, mediaOb.type, JSON.stringify(mediaOb)], callback);
+};
+
+var storeUserMention = function(tweet, mentionOb, callback){
+    winston.info("tweetstore.storeUserMention");
+    insertUserMentionStmt.run([mentionOb.id_str, tweet.id_str, mentionOb.screen_name, mentionOb.name, JSON.stringify(mentionOb)], callback);
+};
+
+var storeUrl = function(tweet, urlOb, callback){
+    winston.info("tweetstore.storeUrl");
+    insertUrlStmt.run([urlOb.expanded_url, tweet.id_str, urlOb.url, JSON.stringify(urlOb)], callback);
+};
+
+var storeHashtag = function(tweet, hashtagOb, callback){
+    winston.info("tweetstore.storeHashtag");
+    insertHashtagStmt.run([hashtagOb.text, tweet.id_str, JSON.stringify(hashtagOb)], callback);
+};
+
+var storeEntities = function(tweet, callback){
+    //store entities if they exist
+    if(tweet.entities){
+        if(tweet.entities.media){
+            _.each(tweet.entities.media, function(val, ind){
+                storeMedia(tweet, val);
+            });
+        }
+        if(tweet.entities.user_mentions){
+            _.each(tweet.entities.user_mentions, function(val, ind){
+                storeUserMention(tweet, val);
+            });
+        }
+        if(tweet.entities.urls){
+            _.each(tweet.entities.urls, function(val, ind){
+                storeUrl(tweet, val);
+            });
+        }
+        if(tweet.entities.hashtags){
+            _.each(tweet.entities.hashtags, function(val, ind){
+                storeHashtag(tweet, val);
+            });
+        }
+    }
+};
 
 var storeTweet = function(tweet, callback){
     winston.info("tweetstore.storeTweet");
@@ -117,12 +206,21 @@ var storeTweet = function(tweet, callback){
     if(tweet.from_user){
         screenname = tweet.from_user;
     }
+    else if(tweet.screen_name){
+        screenname = tweet.screen_name;
+    }
     else if(tweet.user){
         screenname = tweet.user.screen_name;
     }
     
+    var tweetTimestamp = new Date(tweet.created_at);
+    
     storeTweetStmt.run([tweet.id_str, screenname, tweet.created_at, tweet.text, JSON.stringify(tweet)], callback);
+    storeTimestampStmt.run([tweet.id_str, tweetTimestamp.getTime()], function(){});
     storeSearchableTweetStmt.run([tweet.id_str, tweet.text], function(){});
+    
+    storeEntities(tweet, function(){});
+    
     //tweets.update({id:tweet.id}, tweet, {safe:true, upsert:true}, callback);
 };
 
@@ -265,6 +363,21 @@ var closeStore = function(){
     });
 };
 
+var repopulateEntities = function(){
+    db.serialize(function(){
+        db.all("SELECT fulltweet FROM tweets", function(err, rows) {
+            winston.info("BEGINNING MASSIVE ENTITIES TRANSACTION");
+            db.run("BEGIN");
+            _.each(rows, function(row, ind){
+                var tweet = JSON.parse(row.fulltweet);
+                storeEntities(tweet, function(){});
+            });
+            winston.info("COMMITTING MASSIVE ENTITIES TRANSACTION");
+            db.run("COMMIT");
+        });
+    });
+};
+
 exports.init = init;
 exports.storeTweet = storeTweet;
 exports.storeEvent = storeEvent;
@@ -276,4 +389,6 @@ exports.rebuildFTS = rebuildFTS;
 exports.fetchMore = fetchMore;
 exports.searchTweets = searchTweets;
 exports.normalizeTweets = normalizeTweets;
+exports.storeEntities = storeEntities;
+exports.repopulateEntities = repopulateEntities;
 
