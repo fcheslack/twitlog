@@ -216,7 +216,7 @@ var updateRecentTweets = function(){
         winston.info('recent tweets > 0 - fetching since last one');
         tweetstore.fetchSince(recentTweets[0].id_str, function(err, data){
             winston.info(util.inspect(data));
-            if(data.length > 0){
+            if(data && data.length > 0){
                 winston.info("new tweets received in servetweets");
                 winston.info(data);
                 //send tweet to clients
