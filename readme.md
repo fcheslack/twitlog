@@ -6,6 +6,8 @@ ___Install___
 
     npm rebuild
 
+if npm rebuild fails deleting the node_modules directory completely and running npm update might work.
+
 __initialize OAuth__
 >node ./app.js --initoauth 1
 
