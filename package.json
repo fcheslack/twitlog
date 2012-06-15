@@ -1,0 +1,30 @@
+{
+  "author": "Faolan Cheslack-Postava <fcheslack@gmail.com> (faolancp.com)",
+  "name": "twitlog",
+  "description": "Twitter logger on node.js",
+  "version": "0.1.0",
+  "homepage": "https://github.com/fcheslack/twitlog",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/fcheslack/twitlog.git"
+  },
+  "main": "twitlog.js",
+  "dependencies": {
+    "async": ">=0.1.18",
+    "connect-auth": ">=0.5.1",
+    "express": ">=2.5.9",
+    "jqtpl": ">=1.1.0",
+    "ntwitter": ">=0.3.0",
+    "oauth": ">=0.9.7",
+    "optimist": ">=0.3.4",
+    "socket.io": ">=0.9.6",
+    "sqlite3": ">=2.1.3",
+    "underscore": ">=1.3.3",
+    "winston": ">=0.5.11"
+    },
+  "devDependencies": {},
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  }
+}
