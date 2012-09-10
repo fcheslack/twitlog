@@ -138,11 +138,11 @@ Twitter.prototype.post = function(url, content, content_type, callback) {
     else {
       try {
         var json = JSON.parse(data);
-        callback(null, json);
       } 
       catch(err) {
-        callback(err);
+        return callback(err);
       }
+      callback(null, json);
     }
   });
   return this;
@@ -155,7 +155,7 @@ Twitter.prototype.post = function(url, content, content_type, callback) {
 Twitter.prototype.search = function(q, params, callback) {
   if (typeof params === 'function') {
     callback = params;
-    params = null;
+    params = {};
   }
 
   if ( typeof callback !== 'function' ) {
@@ -555,7 +555,7 @@ Twitter.prototype.retweetStatus = function(id, callback) {
 
 Twitter.prototype.getRetweets = function(id, params, callback) {
   var url = '/statuses/retweets/' + escape(id) + '.json';
-  this.get(url, params, null, callback);
+  this.get(url, params,  callback);
   return this;
 }
 
@@ -939,6 +939,32 @@ Twitter.prototype.outgoingFriendship = function(callback) {
 Twitter.prototype.outgoingFriendships
   = Twitter.prototype.outgoingFriendship;
 
+Twitter.prototype.lookupFriendship = function(id, callback) {
+  var url = '/friendships/lookup.json',
+      params = {}, ids = [], names = [];
+  
+  if (typeof id === 'string') {
+    id = id.replace(/^\s+|\s+$/g, '');
+    id = id.split(',');
+  }
+  
+  id = [].concat(id);
+  
+  id.forEach(function(item) {
+    if (parseInt(item, 10)) {
+      ids.push(item);
+    } else {
+      names.push(item);
+    }
+  });
+  
+  params.user_id = ids.toString();
+  params.screen_name = names.toString();
+  
+  this.get(url, params, callback);
+  return this;
+};
+
 // Friends and Followers resources
 
 Twitter.prototype.getFriendsIds = function(id, callback) {
@@ -999,6 +1025,19 @@ Twitter.prototype.updateProfile = function(params, callback) {
   var url = '/account/update_profile.json';
   this.post(url, params, null, callback);
   return this;
+}
+
+Twitter.prototype.updateProfileImg = function (params, callback) {
+  // params: name, url, location, description
+  var defaults = {
+    include_entities: 1
+  };
+  params = utils.merge(defaults, params);
+
+  var url = '/account/update_profile_image.json';
+  this.post(url, params, null, callback);
+  return this;
+  
 }
 
 // FIXME: Account resources section not complete
@@ -1070,7 +1109,7 @@ Twitter.prototype.blockExists = function(id, callback) {
   else
     params.user_id = id;
 
-  this.get(url, params, null, callback);
+  this.get(url, params, callback);
   return this;
 }
 Twitter.prototype.isBlocked
