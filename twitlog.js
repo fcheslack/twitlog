@@ -97,7 +97,7 @@ if(argv.fillUserStream){
     winston.info("FILLING USER STREAM");
     tweetstore.init(dbinfo, {}, function(){
         winston.verbose("tweetstore initiated");
-        twit.verifyCredentials(function(err, data){
+        tc.twit.verifyCredentials(function(err, data){
             if(err){
                 winston.error("Error verifying twitter credentials. Have you fetched an oauth token yet?");
                 winston.error(err);
@@ -107,7 +107,12 @@ if(argv.fillUserStream){
             winston.info("Credentials verified okay");
             winston.verbose(util.inspect(data));
             winston.info("Pulling full user timeline");
-            pullFullUserTimeline({}, function(){
+            var screen_name = '';
+            if(argv.screen_name) screen_name = argv.screen_name;
+            tc.pullFullUserTimeline(screen_name, {}, function(err, tweets){
+                _.each(tweets, function(tweet, ind){
+                    tc.tweetCallback(tweet);
+                });
                 winston.info("Finished pulling full user timeline");
             });
         });

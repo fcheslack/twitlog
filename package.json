@@ -11,7 +11,7 @@
   "main": "twitlog.js",
   "dependencies": {
     "async": ">=0.1.18",
-    "connect-auth": ">=0.5.1",
+//    "connect-auth": ">=0.5.1",
     "express": ">=2.5.9",
     "jqtpl": ">=1.1.0",
     "ntwitter": ">=0.3.0",

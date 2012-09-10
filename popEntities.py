@@ -15,6 +15,7 @@ print(args)
 
 con = sqlite3.connect(args.dbpath)
 
+alltweets = []
 mediaEntities = []
 userMentions = []
 urls = []
@@ -22,6 +23,7 @@ hashtags = []
 
 for row in con.execute("SELECT fulltweet FROM tweets;"):
     ptweet = json.loads(row[0])
+    alltweets.append(ptweet)
     if 'entities' in ptweet:
         if 'media' in ptweet['entities']:
             for mediaOb in ptweet['entities']['media']:
@@ -36,9 +38,9 @@ for row in con.execute("SELECT fulltweet FROM tweets;"):
             for hashtagOb in ptweet['entities']['hashtags']:
                 hashtags.append((hashtagOb['text'], ptweet['id_str'], json.dumps(hashtagOb)))
 
-con.executemany("INSERT OR REPLACE INTO media VALUES (?, ?,?,?,?);", mediaEntities)
-con.executemany("INSERT OR REPLACE INTO user_mentions VALUES (?, ?,?,?,?);", userMentions)
-con.executemany("INSERT OR REPLACE INTO urls VALUES (?, ?,?,?);", urls)
-con.executemany("INSERT OR REPLACE INTO hashtags VALUES (?, ?,?);", hashtags)
+#con.executemany("INSERT OR REPLACE INTO media VALUES (?, ?,?,?,?);", mediaEntities)
+#con.executemany("INSERT OR REPLACE INTO user_mentions VALUES (?, ?,?,?,?);", userMentions)
+#con.executemany("INSERT OR REPLACE INTO urls VALUES (?, ?,?,?);", urls)
+#con.executemany("INSERT OR REPLACE INTO hashtags VALUES (?, ?,?);", hashtags)
 
-con.commit()
+#con.commit()

@@ -18,8 +18,12 @@ var argv = require('optimist')
     .default('dbtype', 'sqlite')
     .argv;
     
-var app = express.createServer();
-var io = require('socket.io').listen(app);
+var app = express();
+var server = require('http').createServer(app);
+var io = require('socket.io').listen(server);
+
+server.listen(8088);
+
 
 var credentials = JSON.parse(fs.readFileSync(argv.credfile));
 var appconfig = JSON.parse(fs.readFileSync(argv.conffile) );
@@ -56,15 +60,15 @@ app.configure('development', function(){
   }));
 });
 
-app.dynamicHelpers({
+/*app.dynamicHelpers({
   session: function(req, res){
     return req.session;
   }
 });
-
+ */
 app.set("view engine", "html");
-app.register(".html", require("jqtpl").express);
-app.register(".css", require("jqtpl").express);
+//app.register(".html", require("jqtpl").express);
+//app.register(".css", require("jqtpl").express);
 //app.register('.html', require('jade'));
 
 //app.get('/', function(req, res){
@@ -135,14 +139,15 @@ app.get('/tweets/search', function(req, res){
   //winston.info(util.inspect(req.query));
   tweetstore.searchTweets(req.param('q', ''), function(err, tweets){
     var r = {tweets:tweets};
-    res.end(JSON.stringify(r));
+    res.json(r);
+    //res.end(JSON.stringify(r));
     //socket.emit('olderTweets', r);
   });
 });
 
 
 
-app.listen(parseInt(process.env.PORT || 8088, 10));
+//app.listen(parseInt(process.env.PORT || 8088, 10));
 
 
 

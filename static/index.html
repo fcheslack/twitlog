@@ -2,16 +2,34 @@
 <html>
 
 <head>
-    <title>TweetLog</title>
+    <meta charset="utf-8">
+    <title>Tweetlog</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
     
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
     
-    <link rel=stylesheet href="./style.css">
+    <link rel=stylesheet href="./css/bootstrap.min.css">
+    <link rel=stylesheet href="./css/bootstrap-responsive.min.css">
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+      .sidebar-nav {
+        padding: 9px 0;
+      }
+    </style>
     
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
-    <script src="http://localhost:8088/jquery.tmpl.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js"></script>
+    <script src="./js/jsrender.js"></script>
     <script type="text/javascript" src="//platform.twitter.com/widgets.js"></script>
-    <script src="http://localhost:8088/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="./js/bootstrap.min.js"></script>
     <script>
     
     </script>
@@ -35,31 +53,34 @@
                     if(tweet.entities){
                         J.each(tweet.entities.user_mentions, function(index, mention){
                             var mstring = '@' + mention.screen_name;
-                            var repstring = J("#mentionlinkTemplate").tmpl({screen_name:mention.screen_name}).html();
+                            var repstring = J("#mentionlinkTemplate").render({screen_name:mention.screen_name});
                             muText = muText.replace(mstring, repstring);
                             //console.log(mstring);
                             //console.log(repstring);
                         });
                         J.each(tweet.entities.hashtags, function(index, hashtag){
                             var hstring = '#' + hashtag.text;
-                            var repstring = J("#hashlinkTemplate").tmpl({hash_text:hashtag.text}).html();
+                            var repstring = J("#hashlinkTemplate").render({hash_text:hashtag.text});
                             muText = muText.replace(hstring, repstring);
                             //console.log(repstring);
                         });
                         J.each(tweet.entities.urls, function(index, url){
                             var tstring = url.url;
-                            var repstring = J("#tweetedurlTemplate").tmpl({tweetedurl:url.url, displayurl:url.display_url}).html();
+                            var repstring = J("#tweetedurlTemplate").render({tweetedurl:url.url, displayurl:url.display_url});
                             muText = muText.replace(tstring, repstring);
                             //console.log(repstring);
                         });
                     }
+                    //wrap other links, like t.co that twitter doesn't include in entities, in anchor tags
+                    //TODO
+                    
                     tweet.muText = muText;
                     //console.log(muText);
                     if(older){
-                        J("#tweetTemplate").tmpl({tweet:tweet}).appendTo(targetEl);
+                        J(targetEl).append(J("#tweetTemplate").render({tweet:tweet}) );
                     }
                     else{
-                        J("#tweetTemplate").tmpl({tweet:tweet}).prependTo(targetEl);
+                        J(targetEl).prepend(J("#tweetTemplate").render({tweet:tweet}) );
                     }
                 });
             }
@@ -72,48 +93,34 @@
         var J = jQuery.noConflict();
         
         jQuery(document).ready(function() {
-            //bind pullout grabber animation
-            J('#pullout-grabbutton').on('click', function(e){
-                console.log("grabbutton clicked");
-                var showing = J("#pullout").data('showing');
-                if(!showing){
-                    J("#pullout").animate({
-                        left: '0px'
-                    });
-                    J("#pullout").data('showing', true)
-                }
-                else{
-                    J("#pullout").animate({
-                        left: '-400px'
-                    });
-                    J("#pullout").data('showing', false)
-                }
-            });
             
             J("#more-tweets-link").on('click', function(e){
                 e.preventDefault();
                 socket.emit('moreTweets', {oldestTweetID:oldestTweetID});
             });
             
-            J("#search-link").on('click', function(e){
+            J("#tweet-search-form").on('submit', function(e){
+                console.log("search form submitted");
                 e.preventDefault();
-                J("#content").hide();
-                J("#searchcontent").show();
-                var q = J("#search-input").val();
-                socket.emit('search', {q:q});
+                var q = J("#tweet-search-input").val();
+                console.log("q: " + q);
+                J.getJSON('/tweets/search', {q:q}, function(data){
+                    displayTweets(data.tweets, J("#search-content .tweets-container"));
+                });
+                //socket.emit('search', {q:q});
             });
             
             J("#live-stream-link").on('click', function(e){
                 e.preventDefault();
                 J("#searchcontent").hide();
-                J("#content").show();
+                J("#tweets-content").show();
             });
             
             socket = io.connect('http://localhost:8088');
             socket.on('initialTweets', function (data) {
                 //console.log(data);
                 tweets = data.tweets;
-                displayTweets(data.tweets.reverse(), J("#content .tweets-container"));
+                displayTweets(data.tweets.reverse(), J("#tweets-content .tweets-container"));
             });
             
             socket.on('newTweets', function (data) {
@@ -127,7 +134,7 @@
             
             socket.on('searchResults', function (data) {
                 J("#searchcontent .tweets-container").empty();
-                displayTweets(data.tweets, J("#searchcontent .tweets-container"));
+                displayTweets(data.tweets, J("#searchcontent .tweets-container"), true);
             });
         });
 
@@ -147,83 +154,153 @@
 </head>
 
 <body>
-<div id="content">
-    <h2>Live Stream</h2>
-    <div class="tweets-container">
-        
-    </div>
-</div>
-<div id="searchcontent">
-    <h2>Archive Search</h2>
-    <div class="tweets-container">
-        
-    </div>
-</div>
-<div id="post-content">
-    <a href="#" id="more-tweets-link">More Tweets</a>
-    <span class="twitterWordmark">Content from Twitter</span>
-</div>
-
-<script id="mentionlinkTemplate" type="text/x-jquery-tmpl">
-    <div class="wrapdiv">
-    <a class="mentionlink" href="http://twitter.com/${screen_name}">@${screen_name}</a>
-    </div>
-</script>
-
-<script id="hashlinkTemplate" type="text/x-jquery-tmpl">
-    <div class="wrapdiv">
-    <a class="hashlink" href="http://twitter.com/search?q=%23${hash_text}">#${hash_text}</a>
-    </div>
-</script>
-
-<script id="tweetedurlTemplate" type="text/x-jquery-tmpl">
-    <div class="wrapdiv">
-    <a class="tweetedurllink" href="${tweetedurl}">${displayurl}</a>
-    </div>
-</script>
-
-<script id="tweetTemplate" type="text/x-jquery-tmpl">
-    <div class="tweet">
-        {{if tweet.from_user}}
-        <a href="http://twitter.com/${tweet.from_user}"><img class="twitterProfileImg" src="${tweet.profile_image_url}"></a>
-        <span class="from_user"><a href="http://twitter.com/${tweet.from_user}">${tweet.from_user}</a></span>
-        <span class="from_user_name">${tweet.from_user_name}</span>
-        <div class="tweetContent">
-            {{html tweet.muText}}
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container-fluid">
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+          <a class="brand" href="#">Tweetlog</a>
+          <div class="nav-collapse collapse">
+            <p class="navbar-text pull-right">
+              Logged in as <a href="#" class="navbar-link">Username</a>
+            </p>
+            <ul class="nav nav-tabs">
+              <li class="active"><a href="#tweets-content" data-toggle="tab">Tweets</a></li>
+              <li><a href="#search-content" data-toggle="tab">Search</a></li>
+              <li><a href="#people-content" data-toggle="tab">People</a></li>
+              <li><a href="#tags-content" data-toggle="tab">Tags</a></li>
+              <li><a href="#links-content" data-toggle="tab">Links</a></li>
+              <li><a href="#media-content" data-toggle="tab">Media</a></li>
+            </ul>
+          </div><!--/.nav-collapse -->
         </div>
-        <span class="tweetTime"><a href="http://twitter.com/${tweet.from_user}/statuses/${tweet.id_str}">${tweet.created_at}</a></span>
-        <a href="https://twitter.com/intent/tweet?in_reply_to=${tweet.id_str}">Reply</a>
-        <a href="https://twitter.com/intent/retweet?tweet_id=${tweet.id_str}">Retweet</a>
-        <a href="https://twitter.com/intent/favorite?tweet_id=${tweet.id_str}">Favorite</a>
-        {{else tweet.user}}
-        <a href="http://twitter.com/${tweet.user.screen_name}"><img class="twitterProfileImg" src="${tweet.user.profile_image_url}"></a>
-        <span class="from_user"><a href="http://twitter.com/${tweet.user.screen_name}">${tweet.user.screen_name}</a></span>
-        <span class="from_user_name">${tweet.user.name}</span>
-        <div class="tweetContent">
-            {{html tweet.muText}}
-        </div>
-        <span class="tweetTime"><a href="http://twitter.com/${tweet.from_user}/statuses/${tweet.id_str}">${tweet.created_at}</a></span>
-        <a href="https://twitter.com/intent/tweet?in_reply_to=${tweet.id_str}">Reply</a>
-        <a href="https://twitter.com/intent/retweet?tweet_id=${tweet.id_str}">Retweet</a>
-        <a href="https://twitter.com/intent/favorite?tweet_id=${tweet.id_str}">Favorite</a>
-        {{/if}}
+      </div>
     </div>
+
+    <div class="container-fluid">
+      <div class="row-fluid">
+        <div class="span3">
+          <div class="well sidebar-nav">
+            <ul class="nav nav-list">
+              <li class="nav-header">Sidebar</li>
+              <li class="active"><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li class="nav-header">Sidebar</li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li class="nav-header">Sidebar</li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+            </ul>
+          </div><!--/.well -->
+        </div><!--/span-->
+        
+        <div class="span9 tab-content">
+            <div class="tab-pane active" id="tweets-content">
+              <div class="tweets-container">
+              </div><!--/tweets-container-->
+            </div><!--/span-->
+            <div class="tab-pane" id="search-content">
+              <form class="form-search" id="tweet-search-form">
+                  <div class="input-append">
+                    <input type="text" id="tweet-search-input">
+                    <button type="submit" class="btn">Search</button>
+                  </div>
+              </form>
+              <div class="tweets-container">
+              </div><!--/tweets-container-->
+            </div><!--/span-->
+            <div class="tab-pane" id="people-content">
+              <div class="tweets-container">
+                <h1>People</h1>
+              </div><!--/tweets-container-->
+            </div><!--/span-->
+            <div class="tab-pane" id="tags-content">
+              <div class="tweets-container">
+                <h1>Tags</h1>
+              </div><!--/tweets-container-->
+            </div><!--/span-->
+            <div class="tab-pane" id="links-content">
+              <div class="tweets-container">
+                <h1>Links</h1>
+              </div><!--/tweets-container-->
+            </div><!--/span-->
+            <div class="tab-pane" id="media-content">
+              <div class="tweets-container">
+                <h1>Media</h1>
+              </div><!--/tweets-container-->
+            </div><!--/span-->
+        </div>
+      </div><!--/row-->
+      
+      
+
+      <hr>
+
+      <footer>
+        <p>&copy; Company 2012</p>
+      </footer>
+
+    </div><!--/.fluid-container-->
+    
+<script id="mentionlinkTemplate" type="text/x-jsrender">
+    <span class="wrap"><a class="mentionlink" href="http://twitter.com/{{>screen_name}}">@{{>screen_name}}</a></span>
 </script>
 
-<div id="pullout" class="pullout">
-    <div id="pullout-grabbutton" class="pullout-grabbutton">
-        &gt;
-    </div>
-    <div id="pullout-menu">
-        <ul id="pullout-menu-links-list">
-            <li><input type="text" id="search-input" /><a href="#" id="search-link">Search</a></li>
-            <li><a href="#" id="live-stream-link">Live Stream</a></li>
-            <!--
-            <li><a href="/sessions/connect" id="oauth-start">Authorize App</a></li>
-            -->
-        </ul>
-    </div>
-</div>
+<script id="hashlinkTemplate" type="text/x-jsrender">
+    <span class="wrap"><a class="hashlink" href="http://twitter.com/search?q=%23{{>hash_text}}">#{{>hash_text}}</a></span>
+</script>
+
+<script id="tweetedurlTemplate" type="text/x-jsrender">
+    <span class="wrap"><a class="tweetedurllink" href="{{>tweetedurl}}">{{>displayurl}}</a></span>
+</script>
+
+<script id="tweetTemplate" type="text/x-jsrender">
+    <div class="row-fluid">
+        <div class="span12 tweet well">
+            {{if tweet.from_user}}
+            <div class="span1">
+                <a href="http://twitter.com/{{>tweet.from_user}}"><img class="twitterProfileImg" src="{{>tweet.profile_image_url}}"></a>
+            </div>
+            <div class="span11">
+                <span class="from_user"><a href="http://twitter.com/{{>tweet.from_user}}">@{{>tweet.from_user}}</a></span>
+                <span class="from_user_name">{{>tweet.from_user_name}}</span>
+                <div class="tweetContent">
+                    {{:tweet.muText}}
+                </div>
+                <span class="tweetTime"><a href="http://twitter.com/{{>tweet.from_user}}/statuses/{{>tweet.id_str}}">{{>tweet.created_at}}</a></span>
+                <a class="btn" href="https://twitter.com/intent/tweet?in_reply_to={{>tweet.id_str}}"><i class="icon-share-alt"></i> Reply</a>
+                <a class="btn" href="https://twitter.com/intent/retweet?tweet_id={{>tweet.id_str}}"><i class="icon-retweet"></i> Retweet</a>
+                <a class="btn" href="https://twitter.com/intent/favorite?tweet_id={{>tweet.id_str}}"><i class="icon-star"></i> Favorite</a>
+            </div>
+            {{else tweet.user}}
+            <div class="span1">
+                <a href="http://twitter.com/{{>tweet.user.screen_name}}"><img class="twitterProfileImg" src="{{>tweet.user.profile_image_url}}"></a>
+            </div>
+            <div class="span11">
+                <span class="from_user"><a href="http://twitter.com/{{>tweet.user.screen_name}}">@{{>tweet.user.screen_name}}</a></span>
+                <span class="from_user_name">{{>tweet.user.name}}</span>
+                <div class="tweetContent">
+                    {{:tweet.muText}}
+                </div>
+                <span class="tweetTime"><a href="http://twitter.com/{{>tweet.user.screen_name}}/statuses/{{>tweet.id_str}}">{{>tweet.created_at}}</a></span>
+                <a class="btn" href="https://twitter.com/intent/tweet?in_reply_to={{>tweet.id_str}}"><i class="icon-share-alt"></i> Reply</a>
+                <a class="btn" href="https://twitter.com/intent/retweet?tweet_id={{>tweet.id_str}}"><i class="icon-retweet"></i> Retweet</a>
+                <a class="btn" href="https://twitter.com/intent/favorite?tweet_id={{>tweet.id_str}}"><i class="icon-star"></i> Favorite</a>
+            </div>
+            {{/if}}
+        </div>
+    </div> <!--/row -->
+</script>
 </body>
-
 </html>
